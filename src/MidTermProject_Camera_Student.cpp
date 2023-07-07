@@ -102,7 +102,19 @@ int main(int argc, const char *argv[])
         cv::Rect vehicleRect(535, 180, 180, 150);
         if (bFocusOnVehicle)
         {
-            // ...
+            for (auto k = keypoints.begin(); k != keypoints.end(); k++) {
+                cv::Point2f point(k->pt.x, k->pt.y); // Get the keypoint's coordinates
+
+                if (!vehicleRect.contains(point)) {
+                    // create a new iterator to delete
+                    auto new_k = k;
+                    // move k back so we can keep iterating
+                    k--;
+
+                    // delete this keypoint
+                    keypoints.erase(new_k);
+                }
+            }
         }
 
         //// EOF STUDENT ASSIGNMENT
