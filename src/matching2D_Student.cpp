@@ -1,5 +1,7 @@
 #include <numeric>
 #include "matching2D.hpp"
+#include <opencv2/features2d.hpp>
+#include <algorithm>
 
 using namespace std;
 
@@ -18,7 +20,7 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
     }
     else if (matcherType.compare("MAT_FLANN") == 0)
     {
-        // ...
+        matcher = cv::FlannBasedMatcher::create();
     }
 
     // perform matching task
@@ -29,29 +31,59 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
     }
     else if (selectorType.compare("SEL_KNN") == 0)
     { // k nearest neighbors (k=2)
-
-        // ...
+        int k = 2;
+        std::vector<std::vector<cv::DMatch>> knnMatches;
+        matcher->knnMatch(descSource, descRef, knnMatches, k);
+        // Apply the ratio test to filter good matches
+        float ratioThreshold = 0.8;  // Threshold for the ratio test
+        std::vector<cv::DMatch> goodMatches;
+        for (const auto& m : knnMatches) {
+            if (m.size() >= 2) {
+                float ratio = m[0].distance / m[1].distance;
+                if (ratio < ratioThreshold) {
+                    matches.push_back(m[0]);
+                }
+            }
+        }
     }
 }
 
 // Use one of several types of state-of-art descriptors to uniquely identify keypoints
 void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descriptors, string descriptorType)
 {
+    int threshold = 30;        // FAST/AGAST detection threshold score.
+    int octaves = 3;           // detection octaves (use 0 to do single scale)
+    int scaleLvls = 3;
+    float patternScale = 1.0f; // apply this scale to the pattern used for sampling the neighbourhood of a keypoint.
+    
     // select appropriate descriptor
     cv::Ptr<cv::DescriptorExtractor> extractor;
-    if (descriptorType.compare("BRISK") == 0)
-    {
 
-        int threshold = 30;        // FAST/AGAST detection threshold score.
-        int octaves = 3;           // detection octaves (use 0 to do single scale)
-        float patternScale = 1.0f; // apply this scale to the pattern used for sampling the neighbourhood of a keypoint.
-
+    //// -> BRIEF, ORB, FREAK, AKAZE, SIFT
+    if (descriptorType == "BRISK") {
         extractor = cv::BRISK::create(threshold, octaves, patternScale);
     }
-    else
-    {
+    else if (descriptorType == "BRIEF") {
+        extractor = cv::xfeatures2d::BriefDescriptorExtractor::create();
+    }
+    else if (descriptorType == "ORB") {
+        extractor = cv::ORB::create(threshold, octaves, patternScale);
+    }
+    else if (descriptorType == "FREAK") {
+        extractor = cv::xfeatures2d::FREAK::create();
+    }
+    else if (descriptorType == "AKAZE") {
+        extractor = cv::AKAZE::create(cv::AKAZE::DESCRIPTOR_MLDB, 0, 3, octaves, scaleLvls);
+    }
+    else if (descriptorType == "SIFT") {
+        extractor = cv::SIFT::create(threshold, octaves, patternScale);
+    } else {
+        return;
+    }
 
-        //...
+    for (auto& k : keypoints) {
+        k.class_id = k.class_id < 0 ? 0 : k.class_id > octaves + scaleLvls ? octaves + scaleLvls : k.class_id;
+        // std::cout << k.class_id << std::endl;
     }
 
     // perform feature description
