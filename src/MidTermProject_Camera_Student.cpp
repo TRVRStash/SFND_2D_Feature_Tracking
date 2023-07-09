@@ -7,6 +7,7 @@
 #include <cmath>
 #include <limits>
 #include <opencv2/core.hpp>
+#include <chrono>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
@@ -41,6 +42,8 @@ int main(int argc, const char *argv[])
     bool bVis = false;            // visualize results
 
     /* MAIN LOOP OVER ALL IMAGES */
+    std::vector<int> numPoints;
+    std::vector<std::chrono::milliseconds> timeLog;
 
     for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex++)
     {
@@ -71,6 +74,7 @@ int main(int argc, const char *argv[])
         cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
 
         /* DETECT IMAGE KEYPOINTS */
+        auto start_tp = std::chrono::steady_clock::now();
 
         // extract 2D keypoints from current image
         vector<cv::KeyPoint> keypoints; // create empty feature list for current image
@@ -92,6 +96,7 @@ int main(int argc, const char *argv[])
         {
             detKeypointsModern(keypoints, imgGray, detectorType, false);
         }
+
         //// EOF STUDENT ASSIGNMENT
 
         //// STUDENT ASSIGNMENT
@@ -117,10 +122,11 @@ int main(int argc, const char *argv[])
             }
         }
 
+
         //// EOF STUDENT ASSIGNMENT
 
         // optional : limit number of keypoints (helpful for debugging and learning)
-        bool bLimitKpts = true;
+        bool bLimitKpts = false;
         if (bLimitKpts)
         {
             int maxKeypoints = 50;
@@ -144,9 +150,10 @@ int main(int argc, const char *argv[])
         //// -> BRIEF, ORB, FREAK, AKAZE, SIFT
 
         cv::Mat descriptors;
-        string descriptorType = "BRIEF"; // BRIEF, ORB, FREAK, AKAZE, SIFT
+        string descriptorType = "SIFT"; // BRIEF, ORB, FREAK, AKAZE, SIFT
         descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
         //// EOF STUDENT ASSIGNMENT
+
 
         // push descriptors for current frame to end of data buffer
         (dataBuffer.end() - 1)->descriptors = descriptors;
@@ -161,7 +168,7 @@ int main(int argc, const char *argv[])
             vector<cv::DMatch> matches;
             string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
             string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
-            string selectorType = "SEL_KNN";       // SEL_NN, SEL_KNN
+            string selectorType = "SEL_NN";       // SEL_NN, SEL_KNN
 
             //// STUDENT ASSIGNMENT
             //// TASK MP.5 -> add FLANN matching in file matching2D.cpp
@@ -172,7 +179,8 @@ int main(int argc, const char *argv[])
                              matches, descriptorType, matcherType, selectorType);
 
             //// EOF STUDENT ASSIGNMENT
-
+            numPoints.push_back(matches.size());
+            timeLog.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_tp));
             // store matches in current data frame
             (dataBuffer.end() - 1)->kptMatches = matches;
 
@@ -199,6 +207,11 @@ int main(int argc, const char *argv[])
         }
 
     } // eof loop over all images
+
+    std::cout << "Completed CV, number of keypoints defined below: \n";
+    for (int i = 0; i < 10; i++) {
+        std::cout <<"Run: " << i << " Number matches: " << numPoints[i] << " time: " << timeLog[i].count() << " ms" << std::endl;
+    }
 
     return 0;
 }
